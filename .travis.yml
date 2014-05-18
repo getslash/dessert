@@ -1,0 +1,11 @@
+language: python
+# command to install dependencies
+install: "pip install -U detox"
+# # command to run tests
+script: detox --recreate -i ALL=https://devpi.net/hpk/dev/
+
+notifications:
+  irc:
+    - "chat.freenode.net#pytest-dev"
+  email:
+    - pytest-commit@python.org

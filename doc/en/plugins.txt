@@ -1,0 +1,424 @@
+.. _plugins:
+
+Working with plugins and conftest files
+=============================================
+
+``pytest`` implements all aspects of configuration, collection, running and reporting by calling `well specified hooks`_.  Virtually any Python module can be registered as a plugin.  It can implement any number of hook functions (usually two or three) which all have a ``pytest_`` prefix, making hook functions easy to distinguish and find.  There are three basic location types:
+
+* `builtin plugins`_: loaded from pytest's internal ``_pytest`` directory.
+* `external plugins`_: modules discovered through `setuptools entry points`_
+* `conftest.py plugins`_: modules auto-discovered in test directories
+
+.. _`pytest/plugin`: http://bitbucket.org/hpk42/pytest/src/tip/pytest/plugin/
+.. _`conftest.py plugins`:
+.. _`conftest.py`:
+.. _`localplugin`:
+.. _`conftest`:
+
+conftest.py: local per-directory plugins
+--------------------------------------------------------------
+
+local ``conftest.py`` plugins contain directory-specific hook
+implementations.  Session and test running activities will
+invoke all hooks defined in ``conftest.py`` files closer to the
+root of the filesystem.  Example: Assume the following layout
+and content of files::
+
+    a/conftest.py:
+        def pytest_runtest_setup(item):
+            # called for running each test in 'a' directory
+            print ("setting up", item)
+
+    a/test_in_subdir.py:
+        def test_sub():
+            pass
+
+    test_flat.py:
+        def test_flat():
+            pass
+
+Here is how you might run it::
+
+     py.test test_flat.py   # will not show "setting up"
+     py.test a/test_sub.py  # will show "setting up"
+
+.. Note::
+    If you have ``conftest.py`` files which do not reside in a
+    python package directory (i.e. one containing an ``__init__.py``) then
+    "import conftest" can be ambiguous because there might be other
+    ``conftest.py`` files as well on your PYTHONPATH or ``sys.path``.
+    It is thus good practise for projects to either put ``conftest.py``
+    under a package scope or to never import anything from a
+    conftest.py file.
+
+.. _`external plugins`:
+.. _`extplugins`:
+
+Installing External Plugins / Searching
+------------------------------------------------------
+
+Installing a plugin happens through any usual Python installation
+tool, for example::
+
+    pip install pytest-NAME
+    pip uninstall pytest-NAME
+
+If a plugin is installed, ``pytest`` automatically finds and integrates it,
+there is no need to activate it.  We have a :doc:`page listing
+all 3rd party plugins and their status against the latest py.test version
+<plugins_index/index>` and here is a little annotated list
+for some popular plugins:
+
+.. _`django`: https://www.djangoproject.com/
+
+* `pytest-django <http://pypi.python.org/pypi/pytest-django>`_: write tests
+  for `django`_ apps, using pytest integration.
+
+* `pytest-twisted <http://pypi.python.org/pypi/pytest-twisted>`_: write tests
+  for `twisted <http://twistedmatrix.com>`_ apps, starting a reactor and
+  processing deferreds from test functions.
+
+* `pytest-capturelog <http://pypi.python.org/pypi/pytest-capturelog>`_:
+  to capture and assert about messages from the logging module
+
+* `pytest-cov <http://pypi.python.org/pypi/pytest-cov>`_:
+  coverage reporting, compatible with distributed testing
+
+* `pytest-xdist <http://pypi.python.org/pypi/pytest-xdist>`_:
+  to distribute tests to CPUs and remote hosts, to run in boxed
+  mode which allows to survive segmentation faults, to run in
+  looponfailing mode, automatically re-running failing tests
+  on file changes, see also :ref:`xdist`
+
+* `pytest-instafail <http://pypi.python.org/pypi/pytest-instafail>`_:
+  to report failures while the test run is happening.
+
+* `pytest-bdd <http://pypi.python.org/pypi/pytest-bdd>`_ and
+  `pytest-konira <http://pypi.python.org/pypi/pytest-konira>`_
+  to write tests using behaviour-driven testing.
+
+* `pytest-timeout <http://pypi.python.org/pypi/pytest-timeout>`_:
+  to timeout tests based on function marks or global definitions.
+
+* `pytest-cache <http://pypi.python.org/pypi/pytest-cache>`_:
+  to interactively re-run failing tests and help other plugins to
+  store test run information across invocations.
+
+* `pytest-pep8 <http://pypi.python.org/pypi/pytest-pep8>`_:
+  a ``--pep8`` option to enable PEP8 compliance checking.
+
+* `oejskit <http://pypi.python.org/pypi/oejskit>`_:
+  a plugin to run javascript unittests in life browsers
+
+To see a complete list of all plugins with their latest testing
+status against different py.test and Python versions, please visit
+`pytest-plugs <http://pytest-plugs.herokuapp.com/>`_.
+
+You may also discover more plugins through a `pytest- pypi.python.org search`_.
+
+.. _`available installable plugins`:
+.. _`pytest- pypi.python.org search`: http://pypi.python.org/pypi?%3Aaction=search&term=pytest-&submit=search
+
+Writing a plugin by looking at examples
+------------------------------------------------------
+
+.. _`Distribute`: http://pypi.python.org/pypi/distribute
+.. _`setuptools`: http://pypi.python.org/pypi/setuptools
+
+If you want to write a plugin, there are many real-life examples
+you can copy from:
+
+* a custom collection example plugin: :ref:`yaml plugin`
+* around 20 `builtin plugins`_ which provide pytest's own functionality
+* many `external plugins`_ providing additional features
+
+All of these plugins implement the documented `well specified hooks`_
+to extend and add functionality.
+
+.. _`setuptools entry points`:
+
+Making your plugin installable by others
+-----------------------------------------------
+
+If you want to make your plugin externally available, you
+may define a so-called entry point for your distribution so
+that ``pytest`` finds your plugin module.  Entry points are
+a feature that is provided by `setuptools`_ or `Distribute`_.
+pytest looks up the ``pytest11`` entrypoint to discover its
+plugins and you can thus make your plugin available by defining
+it in your setuptools/distribute-based setup-invocation:
+
+.. sourcecode:: python
+
+    # sample ./setup.py file
+    from setuptools import setup
+
+    setup(
+        name="myproject",
+        packages = ['myproject']
+
+        # the following makes a plugin available to pytest
+        entry_points = {
+            'pytest11': [
+                'name_of_plugin = myproject.pluginmodule',
+            ]
+        },
+    )
+
+If a package is installed this way, ``pytest`` will load
+``myproject.pluginmodule`` as a plugin which can define
+`well specified hooks`_.
+
+.. _`pluginorder`:
+
+Plugin discovery order at tool startup
+--------------------------------------------
+
+``pytest`` loads plugin modules at tool startup in the following way:
+
+* by loading all builtin plugins
+
+* by loading all plugins registered through `setuptools entry points`_.
+
+* by pre-scanning the command line for the ``-p name`` option
+  and loading the specified plugin before actual command line parsing.
+
+* by loading all :file:`conftest.py` files as inferred by the command line
+  invocation:
+
+  - if no test paths are specified use current dir as a test path
+  - if exists, load ``conftest.py`` and ``test*/conftest.py`` relative 
+    to the directory part of the first test path. 
+
+  Note that pytest does not find ``conftest.py`` files in deeper nested
+  sub directories at tool startup.  It is usually a good idea to keep
+  your conftest.py file in the top level test or project root directory.
+
+* by recursively loading all plugins specified by the
+  ``pytest_plugins`` variable in ``conftest.py`` files
+
+
+Requiring/Loading plugins in a test module or conftest file
+-------------------------------------------------------------
+
+You can require plugins in a test module or a conftest file like this::
+
+    pytest_plugins = "name1", "name2",
+
+When the test module or conftest plugin is loaded the specified plugins
+will be loaded as well.  You can also use dotted path like this::
+
+    pytest_plugins = "myapp.testsupport.myplugin"
+
+which will import the specified module as a ``pytest`` plugin.
+
+
+Accessing another plugin by name
+--------------------------------------------
+
+If a plugin wants to collaborate with code from
+another plugin it can obtain a reference through
+the plugin manager like this:
+
+.. sourcecode:: python
+
+    plugin = config.pluginmanager.getplugin("name_of_plugin")
+
+If you want to look at the names of existing plugins, use
+the ``--traceconfig`` option.
+
+.. _`findpluginname`:
+
+Finding out which plugins are active
+----------------------------------------------------------------------------
+
+If you want to find out which plugins are active in your
+environment you can type::
+
+    py.test --traceconfig
+
+and will get an extended test header which shows activated plugins
+and their names. It will also print local plugins aka
+:ref:`conftest.py <conftest>` files when they are loaded.
+
+.. _`cmdunregister`:
+
+Deactivating / unregistering a plugin by name
+----------------------------------------------------------------------------
+
+You can prevent plugins from loading or unregister them::
+
+    py.test -p no:NAME
+
+This means that any subsequent try to activate/load the named
+plugin will it already existing.  See :ref:`findpluginname` for
+how to obtain the name of a plugin.
+
+.. _`builtin plugins`:
+
+pytest default plugin reference
+====================================
+
+
+You can find the source code for the following plugins
+in the `pytest repository <http://bitbucket.org/hpk42/pytest/>`_.
+
+.. autosummary::
+
+    _pytest.assertion
+    _pytest.capture
+    _pytest.config
+    _pytest.doctest
+    _pytest.genscript
+    _pytest.helpconfig
+    _pytest.junitxml
+    _pytest.mark
+    _pytest.monkeypatch
+    _pytest.nose
+    _pytest.pastebin
+    _pytest.pdb
+    _pytest.pytester
+    _pytest.python
+    _pytest.recwarn
+    _pytest.resultlog
+    _pytest.runner
+    _pytest.main
+    _pytest.skipping
+    _pytest.terminal
+    _pytest.tmpdir
+    _pytest.unittest
+
+.. _`well specified hooks`:
+
+pytest hook reference
+====================================
+
+Hook specification and validation
+-----------------------------------------
+
+``pytest`` calls hook functions to implement initialization, running,
+test execution and reporting.  When ``pytest`` loads a plugin it validates
+that each hook function conforms to its respective hook specification.
+Each hook function name and its argument names need to match a hook
+specification.  However, a hook function may accept *fewer* parameters
+by simply not specifying them.  If you mistype argument names or the
+hook name itself you get an error showing the available arguments.
+
+Initialization, command line and configuration hooks
+--------------------------------------------------------------------
+
+.. currentmodule:: _pytest.hookspec
+
+.. autofunction:: pytest_load_initial_conftests
+.. autofunction:: pytest_cmdline_preparse
+.. autofunction:: pytest_cmdline_parse
+.. autofunction:: pytest_namespace
+.. autofunction:: pytest_addoption
+.. autofunction:: pytest_cmdline_main
+.. autofunction:: pytest_configure
+.. autofunction:: pytest_unconfigure
+
+Generic "runtest" hooks
+------------------------------
+
+All runtest related hooks receive a :py:class:`pytest.Item` object.
+
+.. autofunction:: pytest_runtest_protocol
+.. autofunction:: pytest_runtest_setup
+.. autofunction:: pytest_runtest_call
+.. autofunction:: pytest_runtest_teardown
+.. autofunction:: pytest_runtest_makereport
+
+For deeper understanding you may look at the default implementation of
+these hooks in :py:mod:`_pytest.runner` and maybe also
+in :py:mod:`_pytest.pdb` which interacts with :py:mod:`_pytest.capture`
+and its input/output capturing in order to immediately drop
+into interactive debugging when a test failure occurs.
+
+The :py:mod:`_pytest.terminal` reported specifically uses
+the reporting hook to print information about a test run.
+
+Collection hooks
+------------------------------
+
+``pytest`` calls the following hooks for collecting files and directories:
+
+.. autofunction:: pytest_ignore_collect
+.. autofunction:: pytest_collect_directory
+.. autofunction:: pytest_collect_file
+
+For influencing the collection of objects in Python modules
+you can use the following hook:
+
+.. autofunction:: pytest_pycollect_makeitem
+.. autofunction:: pytest_generate_tests
+
+After collection is complete, you can modify the order of
+items, delete or otherwise amend the test items:
+
+.. autofunction:: pytest_collection_modifyitems
+
+Reporting hooks
+------------------------------
+
+Session related reporting hooks:
+
+.. autofunction:: pytest_collectstart
+.. autofunction:: pytest_itemcollected
+.. autofunction:: pytest_collectreport
+.. autofunction:: pytest_deselected
+
+And here is the central hook for reporting about
+test execution:
+
+.. autofunction:: pytest_runtest_logreport
+
+
+Debugging/Interaction hooks
+--------------------------------------
+
+There are few hooks which can be used for special
+reporting or interaction with exceptions:
+
+.. autofunction:: pytest_internalerror
+.. autofunction:: pytest_keyboard_interrupt
+.. autofunction:: pytest_exception_interact
+
+Reference of objects involved in hooks
+===========================================================
+
+.. autoclass:: _pytest.config.Config()
+    :members:
+
+.. autoclass:: _pytest.config.Parser()
+    :members:
+
+.. autoclass:: _pytest.main.Node()
+    :members:
+
+.. autoclass:: _pytest.main.Collector()
+    :members:
+    :show-inheritance:
+
+.. autoclass:: _pytest.main.Item()
+    :members:
+    :show-inheritance:
+
+.. autoclass:: _pytest.python.Module()
+    :members:
+    :show-inheritance:
+
+.. autoclass:: _pytest.python.Class()
+    :members:
+    :show-inheritance:
+
+.. autoclass:: _pytest.python.Function()
+    :members:
+    :show-inheritance:
+
+.. autoclass:: _pytest.runner.CallInfo()
+    :members:
+
+.. autoclass:: _pytest.runner.TestReport()
+    :members:
+
