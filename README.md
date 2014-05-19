@@ -9,9 +9,13 @@
 Overview
 ========
 
+Dessert is a utility library enabling Python code to introspect assertions raised via the `assert` statement.
+
+It is a standalone version of the introspection code from [pytest](http://pytest.org ), and all credit is due to Holger Krekel and the pytest developers for this code.
+														  
 
 Licence
 =======
 
-BSD3
+Dessert is released under the MIT license. It is 99% based on pytest, which is released under the MIT license.
 

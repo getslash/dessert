@@ -14,7 +14,7 @@ setup(name="dessert",
           "Programming Language :: Python :: 3.3",
           ],
       description="Assertion introspection via AST rewriting",
-      license="BSD3",
+      license="MIT",
       author="Rotem Yaari",
       author_email="vmalloc@gmail.com",
       version=__version__, # pylint: disable=E0602
