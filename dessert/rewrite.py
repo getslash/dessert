@@ -1,18 +1,24 @@
 """Rewrite assertion AST to produce nice error messages"""
-
 import ast
 import errno
-import itertools
 import imp
-import marshal
+import itertools
+import logging
 import os
 import re
 import struct
 import sys
 import types
 
+from munch import Munch
+
+import marshal
+
 import py
-from _pytest.assertion import util
+from . import util
+from .util import format_explanation as _format_explanation
+
+_logger = logging.getLogger(__name__)
 
 
 # pytest caches rewritten pycs in __pycache__.
@@ -35,24 +41,24 @@ PYC_TAIL = "." + PYTEST_TAG + PYC_EXT
 REWRITE_NEWLINES = sys.version_info[:2] != (2, 7) and sys.version_info < (3, 2)
 ASCII_IS_DEFAULT_ENCODING = sys.version_info[0] < 3
 
+class AssertRewritingSession(object):
+
+    def isinitpath(self, filename):
+        return True
+
 class AssertionRewritingHook(object):
     """PEP302 Import hook which rewrites asserts."""
 
     def __init__(self):
-        self.session = None
         self.modules = {}
+        self.session = AssertRewritingSession()
+        self.state = Munch()
         self._register_with_pkg_resources()
 
-    def set_session(self, session):
-        self.fnpats = session.config.getini("python_files")
-        self.session = session
-
     def find_module(self, name, path=None):
-        if self.session is None:
-            return None
         sess = self.session
-        state = sess.config._assertstate
-        state.trace("find_module called for: %s" % name)
+        state = self.state
+        _logger.debug("find_module called for: %s" % name)
         names = name.rsplit(".", 1)
         lastname = names[-1]
         pth = None
@@ -80,24 +86,13 @@ class AssertionRewritingHook(object):
                 return None
         else:
             fn = os.path.join(pth, name.rpartition(".")[2] + ".py")
-        fn_pypath = py.path.local(fn)
+        fn_pypath = fn
         # Is this a test file?
-        if not sess.isinitpath(fn):
-            # We have to be very careful here because imports in this code can
-            # trigger a cycle.
-            self.session = None
-            try:
-                for pat in self.fnpats:
-                    if fn_pypath.fnmatch(pat):
-                        state.trace("matched test file %r" % (fn,))
-                        break
-                else:
-                    return None
-            finally:
-                self.session = sess
+        if not os.path.isfile(fn_pypath):
+            _logger.debug("%s does not exist. Not doing anything", fn_pypath)
+            return None
         else:
-            state.trace("matched test file (was specified on cmdline): %r" %
-                        (fn,))
+            _logger.debug("matched test file (was specified on cmdline): %r" % (fn,))
         # The requested module looks like a test file, so rewrite it. This is
         # the most magical part of the process: load the source, rewrite the
         # asserts, and load the rewritten source. We also cache the rewritten
@@ -107,7 +102,7 @@ class AssertionRewritingHook(object):
         # cached pyc is always a complete, valid pyc. Operations on it must be
         # atomic. POSIX's atomic rename comes in handy.
         write = not sys.dont_write_bytecode
-        cache_dir = os.path.join(fn_pypath.dirname, "__pycache__")
+        cache_dir = os.path.join(os.path.dirname(fn_pypath), "__pycache__")
         if write:
             try:
                 os.mkdir(cache_dir)
@@ -123,17 +118,17 @@ class AssertionRewritingHook(object):
                     # because we're in a zip file.
                     write = False
                 elif e == errno.EACCES:
-                    state.trace("read only directory: %r" % fn_pypath.dirname)
+                    _logger.debug("read only directory: %r" % os.path.join(os.path.dirname(fn_pypath)))
                     write = False
                 else:
                     raise
-        cache_name = fn_pypath.basename[:-3] + PYC_TAIL
+        cache_name = os.path.basename(fn_pypath)[:-3] + PYC_TAIL
         pyc = os.path.join(cache_dir, cache_name)
         # Notice that even if we're in a read-only directory, I'm going
         # to check for a cached pyc. This may not be optimal...
         co = _read_pyc(fn_pypath, pyc)
         if co is None:
-            state.trace("rewriting %r" % (fn,))
+            _logger.debug("rewriting %r" % (fn,))
             co = _rewrite_test(state, fn_pypath)
             if co is None:
                 # Probably a SyntaxError in the test.
@@ -141,7 +136,7 @@ class AssertionRewritingHook(object):
             if write:
                 _make_rewritten_pyc(state, fn_pypath, pyc, co)
         else:
-            state.trace("found cached rewritten pyc for %r" % (fn,))
+            _logger.debug("found cached rewritten pyc for %r" % (fn,))
         self.modules[name] = co, pyc
         return self
 
@@ -161,8 +156,6 @@ class AssertionRewritingHook(object):
             del sys.modules[name]
             raise
         return sys.modules[name]
-
-
 
     def is_package(self, name):
         try:
@@ -198,12 +191,12 @@ def _write_pyc(state, co, source_path, pyc):
     # import. However, there's little reason deviate, and I hope
     # sometime to be able to use imp.load_compiled to load them. (See
     # the comment in load_module above.)
-    mtime = int(source_path.mtime())
+    mtime = int(os.stat(source_path).st_mtime)
     try:
         fp = open(pyc, "wb")
     except IOError:
         err = sys.exc_info()[1].errno
-        state.trace("error writing pyc file at %s: errno=%s" %(pyc, err))
+        _logger.debug("error writing pyc file at %s: errno=%s" % (pyc, err))
         # we ignore any failure to write the cache file
         # there are many reasons, permission-denied, __pycache__ being a
         # file etc.
@@ -225,7 +218,8 @@ BOM_UTF8 = '\xef\xbb\xbf'
 def _rewrite_test(state, fn):
     """Try to read and rewrite *fn* and return the code object."""
     try:
-        source = fn.read("rb")
+        with open(fn, "rb") as f:
+            source = f.read()
     except EnvironmentError:
         return None
     if ASCII_IS_DEFAULT_ENCODING:
@@ -264,15 +258,15 @@ def _rewrite_test(state, fn):
         tree = ast.parse(source)
     except SyntaxError:
         # Let this pop up again in the real import.
-        state.trace("failed to parse: %r" % (fn,))
+        _logger.debug("failed to parse: %r" % (fn,))
         return None
     rewrite_asserts(tree)
     try:
-        co = compile(tree, fn.strpath, "exec")
+        co = compile(tree, fn, "exec")
     except SyntaxError:
         # It's possible that this error is from some bug in the
         # assertion rewriting, but I don't know of a fast way to tell.
-        state.trace("failed to compile: %r" % (fn,))
+        _logger.debug("failed to compile: %r" % (fn,))
         return None
     return co
 
@@ -300,7 +294,7 @@ def _read_pyc(source, pyc):
         return None
     try:
         try:
-            mtime = int(source.mtime())
+            mtime = int(os.stat(source).st_mtime)
             data = fp.read(8)
         except EnvironmentError:
             return None
@@ -323,7 +317,6 @@ def rewrite_asserts(mod):
 
 
 _saferepr = py.io.saferepr
-from _pytest.assertion.util import format_explanation as _format_explanation # noqa
 
 def _should_repr_global_name(obj):
     return not hasattr(obj, "__name__") and not py.builtin.callable(obj)
@@ -402,7 +395,7 @@ class AssertionRewriter(ast.NodeVisitor):
         # Insert some special imports at the top of the module but after any
         # docstrings and __future__ imports.
         aliases = [ast.alias(py.builtin.builtins.__name__, "@py_builtins"),
-                   ast.alias("_pytest.assertion.rewrite", "@pytest_ar")]
+                   ast.alias("dessert.rewrite", "@dessert_ar")]
         expect_docstring = True
         pos = 0
         lineno = 0
@@ -464,7 +457,7 @@ class AssertionRewriter(ast.NodeVisitor):
 
     def helper(self, name, *args):
         """Call a helper in this module."""
-        py_name = ast.Name("@pytest_ar", ast.Load())
+        py_name = ast.Name("@dessert_ar", ast.Load())
         attr = ast.Attribute(py_name, "_" + name, ast.Load())
         return ast.Call(attr, list(args), [], None, None)
 

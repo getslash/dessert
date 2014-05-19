@@ -1,5 +1,4 @@
 """Utilities for assertion debugging"""
-
 import py
 try:
     from collections import Sequence
