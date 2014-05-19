@@ -4,5 +4,8 @@ python:
   - "2.7"
   - "3.3"
   - "pypy"
+install:
+  - "pip install -r test_requirements.txt"
+  - "pip install -e ."
 script: 
-  - "python _test_build.py"
+  - "py.test"

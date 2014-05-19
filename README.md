@@ -21,7 +21,7 @@ Using dessert is fairly simple:
 ```python
 
 >>> with open(tmp_filename, "w") as f:
-...     f.write("""
+...     _ = f.write("""
 ... def func():
 ...     def x():
 ...         return 1
