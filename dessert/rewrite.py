@@ -19,6 +19,7 @@ from . import util
 from .util import format_explanation as _format_explanation
 
 _logger = logging.getLogger(__name__)
+_logger.setLevel(logging.ERROR)
 
 
 # pytest caches rewritten pycs in __pycache__.
