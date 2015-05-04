@@ -118,7 +118,7 @@ class AssertionRewritingHook(object):
                     # One of the path components was not a directory, likely
                     # because we're in a zip file.
                     write = False
-                elif e == errno.EACCES:
+                elif e in [errno.EACCES, errno.EROFS]:
                     _logger.debug("read only directory: %r" % os.path.join(os.path.dirname(fn_pypath)))
                     write = False
                 else:
@@ -142,6 +142,12 @@ class AssertionRewritingHook(object):
         return self
 
     def load_module(self, name):
+        # If there is an existing module object named 'fullname' in
+        # sys.modules, the loader must use that existing module. (Otherwise,
+        # the reload() builtin will not work correctly.)
+        if name in sys.modules:
+            return sys.modules[name]
+
         co, pyc = self.modules.pop(name)
         # I wish I could just call imp.load_compiled here, but __file__ has to
         # be set properly. In Python 3.2+, this all would be handled correctly
@@ -323,7 +329,12 @@ def _should_repr_global_name(obj):
     return not hasattr(obj, "__name__") and not py.builtin.callable(obj)
 
 def _format_boolop(explanations, is_or):
-    return "(" + (is_or and " or " or " and ").join(explanations) + ")"
+    explanation = "(" + (is_or and " or " or " and ").join(explanations) + ")"
+    if py.builtin._istext(explanation):
+        t = py.builtin.text
+    else:
+        t = py.builtin.bytes
+    return explanation.replace(t('%'), t('%%'))
 
 def _call_reprcompare(ops, results, expls, each_obj):
     for i, res, expl in zip(range(len(ops)), results, expls):
