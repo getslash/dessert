@@ -21,6 +21,8 @@ from .util import format_explanation as _format_explanation
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.ERROR)
 
+_MARK_ASSERTION_INTROSPECTION = False
+
 
 # pytest caches rewritten pycs in __pycache__.
 if hasattr(imp, "get_tag"):
@@ -529,6 +531,8 @@ class AssertionRewriter(ast.NodeVisitor):
         negation = ast.UnaryOp(ast.Not(), top_condition)
         self.statements.append(ast.If(negation, body, []))
         explanation = "assert " + explanation
+        if _MARK_ASSERTION_INTROSPECTION:
+            explanation = 'dessert* ' + explanation
         template = ast.Str(explanation)
         msg = self.pop_format_context(template)
         fmt = self.helper("format_explanation", msg)
