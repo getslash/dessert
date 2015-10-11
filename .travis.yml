@@ -1,23 +1,22 @@
 language: python
 sudo: false
 python:
-  - "2.6"
-  - "2.7"
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "pypy"
+- '2.6'
+- '2.7'
+- '3.3'
+- '3.4'
+- '3.5'
+- pypy
 install:
-  - "pip install -r test_requirements.txt"
-  - "pip install -e ."
-script: 
-  - "py.test"
+- pip install -r test_requirements.txt
+- pip install -e .
+script:
+- py.test
 deploy:
   provider: pypi
   user: vmalloc
   password:
-    secure: IiRY8I5mIBebKxMUNygddVLyyd0j9gRG5hly5r07nIeqqB01cUhrHgTnfqQPBbVYsDzFYRNM4p2+D94YlsRyO/ylGXehNpA/Dmb5tVDLtycbQVBx4rkRwEa0nfcXaF3MO1P0NHbEi3scVhLiaYqTGWsEKGIhUrgWyckuAh99FKo=
+    secure: tsqe/JvyDu2dXMK0RPd99izMAoO/cVT6sH0cJkczNytKypATLZlsCRVoL7XHxAaD/e30ZsUduzopHebYXK0NTFKI/Pf7+b8T2BVGUi1Gqbe7EnDmsxZNYkBzbf2mfJn+S8gkmlKav1oMKZH6q7Zn2WBYRlXpoRZcLI//XzRai+k=
   on:
     tags: true
     repo: vmalloc/dessert
-
