@@ -1,7 +1,9 @@
 """Utilities for assertion debugging"""
 import pprint
+import logging
 
-import _pytest._code
+_logger = logging.getLogger(__name__)
+
 import py
 try:
     from collections import Sequence
@@ -179,10 +181,8 @@ def assertrepr_compare(config, op, left, right):
             if istext(left) and istext(right):
                 explanation = _notin_text(left, right, verbose)
     except Exception:
-        explanation = [
-            u('(pytest_assertion plugin: representation of details failed.  '
-              'Probably an object has a faulty __repr__.)'),
-            u(_pytest._code.ExceptionInfo())]
+        _logger.exception("dessert: representation of details failed.  "
+                          "Probably an object has a faulty __repr__.")
 
     if not explanation:
         return None
