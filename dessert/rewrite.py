@@ -601,6 +601,10 @@ class AssertionRewriter(ast.NodeVisitor):
         else:
             assertmsg = ast.Str("")
             explanation = "assert " + explanation
+
+        if _MARK_ASSERTION_INTROSPECTION:
+            explanation = 'dessert* ' + explanation
+
         template = ast.BinOp(assertmsg, ast.Add(), ast.Str(explanation))
         msg = self.pop_format_context(template)
         fmt = self.helper("format_explanation", msg)
