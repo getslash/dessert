@@ -531,9 +531,6 @@ class AssertionRewriter(ast.NodeVisitor):
         return res, self.explanation_param(self.display(res))
 
     def visit_Assert(self, assert_):
-        if assert_.msg:
-            # There's already a message. Don't mess with it.
-            return [assert_]
         self.statements = []
         self.cond_chain = ()
         self.variables = []
