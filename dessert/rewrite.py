@@ -337,7 +337,51 @@ def rewrite_asserts(mod):
     AssertionRewriter().run(mod)
 
 
-_saferepr = py.io.saferepr
+def _saferepr(obj):
+    """Get a safe repr of an object for assertion error messages.
+
+    The assertion formatting (util.format_explanation()) requires
+    newlines to be escaped since they are a special character for it.
+    Normally assertion.util.format_explanation() does this but for a
+    custom repr it is possible to contain one of the special escape
+    sequences, especially '\n{' and '\n}' are likely to be present in
+    JSON reprs.
+
+    """
+    repr = py.io.saferepr(obj)
+    if py.builtin._istext(repr):
+        t = py.builtin.text
+    else:
+        t = py.builtin.bytes
+    return repr.replace(t("\n"), t("\\n"))
+
+def _format_assertmsg(obj):
+    """Format the custom assertion message given.
+
+    For strings this simply replaces newlines with '\n~' so that
+    util.format_explanation() will preserve them instead of escaping
+    newlines.  For other objects py.io.saferepr() is used first.
+
+    """
+    # reprlib appears to have a bug which means that if a string
+    # contains a newline it gets escaped, however if an object has a
+    # .__repr__() which contains newlines it does not get escaped.
+    # However in either case we want to preserve the newline.
+    if py.builtin._istext(obj) or py.builtin._isbytes(obj):
+        s = obj
+        is_repr = False
+    else:
+        s = py.io.saferepr(obj)
+        is_repr = True
+    if py.builtin._istext(s):
+        t = py.builtin.text
+    else:
+        t = py.builtin.bytes
+    s = s.replace(t("\n"), t("\n~")).replace(t("%"), t("%%"))
+    if is_repr:
+        s = s.replace(t("\\n"), t("\n~"))
+    return s
+
 
 def _should_repr_global_name(obj):
     return not hasattr(obj, "__name__") and not py.builtin.callable(obj)
@@ -531,8 +575,15 @@ class AssertionRewriter(ast.NodeVisitor):
         return res, self.explanation_param(self.display(res))
 
     def visit_Assert(self, assert_):
+        """Return the AST statements to replace the ast.Assert instance.
+
+        This re-writes the test of an assertion to provide
+        intermediate values and replace it with an if statement which
+        raises an assertion error with a detailed explanation in case
+        the expression is false.
+
+        """
         self.statements = []
-        self.cond_chain = ()
         self.variables = []
         self.variable_counter = itertools.count()
         self.stack = []
@@ -544,10 +595,13 @@ class AssertionRewriter(ast.NodeVisitor):
         body = self.on_failure
         negation = ast.UnaryOp(ast.Not(), top_condition)
         self.statements.append(ast.If(negation, body, []))
-        explanation = "assert " + explanation
-        if _MARK_ASSERTION_INTROSPECTION:
-            explanation = 'dessert* ' + explanation
-        template = ast.Str(explanation)
+        if assert_.msg:
+            assertmsg = self.helper('format_assertmsg', assert_.msg)
+            explanation = "\n>assert " + explanation
+        else:
+            assertmsg = ast.Str("")
+            explanation = "assert " + explanation
+        template = ast.BinOp(assertmsg, ast.Add(), ast.Str(explanation))
         msg = self.pop_format_context(template)
         fmt = self.helper("format_explanation", msg)
         err_name = ast.Name("AssertionError", ast.Load())
