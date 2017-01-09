@@ -127,7 +127,7 @@ class AssertionRewritingHook(object):
                     # because we're in a zip file.
                     write = False
                 elif e in [errno.EACCES, errno.EROFS, errno.EPERM]:
-                    state.trace("read only directory: %r" % fn_pypath.dirname)
+                    _logger.debug("read only directory: %r" % os.path.join(os.path.dirname(fn_pypath)))
                     write = False
                 else:
                     raise
