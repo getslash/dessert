@@ -118,7 +118,7 @@ class AssertionRewritingHook(object):
                     # One of the path components was not a directory, likely
                     # because we're in a zip file.
                     write = False
-                elif e in [errno.EACCES, errno.EROFS]:
+                elif e in [errno.EACCES, errno.EROFS, errno.EPERM]:
                     _logger.debug("read only directory: %r" % os.path.join(os.path.dirname(fn_pypath)))
                     write = False
                 else:
