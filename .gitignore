@@ -17,6 +17,9 @@ include/
 *.orig
 *~
 
+flycheck-*
+flycheck_*
+
 doc/*/_build
 build/
 dist/
