@@ -9,7 +9,7 @@ from .rewrite import AssertionRewritingHook
 def rewrite_assertions_context():
     hook = AssertionRewritingHook()
     prev_meta_path = sys.meta_path[:]
-    sys.meta_path.append(hook)
+    sys.meta_path.insert(0, hook)
     try:
         yield
     finally:

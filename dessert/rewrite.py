@@ -21,6 +21,8 @@ from .util import format_explanation as _format_explanation
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.ERROR)
 
+_MARK_ASSERTION_INTROSPECTION = False
+
 
 # pytest caches rewritten pycs in __pycache__.
 if hasattr(imp, "get_tag"):
@@ -46,6 +48,12 @@ class AssertRewritingSession(object):
 
     def isinitpath(self, filename):
         return True
+
+if sys.version_info >= (3,5):
+    ast_Call = ast.Call
+else:
+    ast_Call = lambda a,b,c: ast.Call(a, b, c, None, None)
+
 
 class AssertionRewritingHook(object):
     """PEP302 Import hook which rewrites asserts."""
@@ -191,6 +199,12 @@ class AssertionRewritingHook(object):
         #  DefaultProvider is appropriate.
         pkg_resources.register_loader_type(cls, pkg_resources.DefaultProvider)
 
+    def get_data(self, pathname):
+        """Optional PEP302 get_data API.
+        """
+        with open(pathname, 'rb') as f:
+            return f.read()
+
 
 def _write_pyc(state, co, source_path, pyc):
     # Technically, we don't have to have the same pyc format as
@@ -323,7 +337,51 @@ def rewrite_asserts(mod):
     AssertionRewriter().run(mod)
 
 
-_saferepr = py.io.saferepr
+def _saferepr(obj):
+    """Get a safe repr of an object for assertion error messages.
+
+    The assertion formatting (util.format_explanation()) requires
+    newlines to be escaped since they are a special character for it.
+    Normally assertion.util.format_explanation() does this but for a
+    custom repr it is possible to contain one of the special escape
+    sequences, especially '\n{' and '\n}' are likely to be present in
+    JSON reprs.
+
+    """
+    repr = py.io.saferepr(obj)
+    if py.builtin._istext(repr):
+        t = py.builtin.text
+    else:
+        t = py.builtin.bytes
+    return repr.replace(t("\n"), t("\\n"))
+
+def _format_assertmsg(obj):
+    """Format the custom assertion message given.
+
+    For strings this simply replaces newlines with '\n~' so that
+    util.format_explanation() will preserve them instead of escaping
+    newlines.  For other objects py.io.saferepr() is used first.
+
+    """
+    # reprlib appears to have a bug which means that if a string
+    # contains a newline it gets escaped, however if an object has a
+    # .__repr__() which contains newlines it does not get escaped.
+    # However in either case we want to preserve the newline.
+    if py.builtin._istext(obj) or py.builtin._isbytes(obj):
+        s = obj
+        is_repr = False
+    else:
+        s = py.io.saferepr(obj)
+        is_repr = True
+    if py.builtin._istext(s):
+        t = py.builtin.text
+    else:
+        t = py.builtin.bytes
+    s = s.replace(t("\n"), t("\n~")).replace(t("%"), t("%%"))
+    if is_repr:
+        s = s.replace(t("\\n"), t("\n~"))
+    return s
+
 
 def _should_repr_global_name(obj):
     return not hasattr(obj, "__name__") and not py.builtin.callable(obj)
@@ -382,6 +440,11 @@ binop_map = {
     ast.In: "in",
     ast.NotIn: "not in"
 }
+# Python 3.5+ compatibility
+try:
+    binop_map[ast.MatMult] = "@"
+except AttributeError:
+    pass
 
 # Python 3.4+ compatibility
 if hasattr(ast, "NameConstant"):
@@ -478,7 +541,7 @@ class AssertionRewriter(ast.NodeVisitor):
         """Call a helper in this module."""
         py_name = ast.Name("@dessert_ar", ast.Load())
         attr = ast.Attribute(py_name, "_" + name, ast.Load())
-        return ast.Call(attr, list(args), [], None, None)
+        return ast_Call(attr, list(args), [])
 
     def builtin(self, name):
         """Return the builtin called *name*."""
@@ -512,11 +575,15 @@ class AssertionRewriter(ast.NodeVisitor):
         return res, self.explanation_param(self.display(res))
 
     def visit_Assert(self, assert_):
-        if assert_.msg:
-            # There's already a message. Don't mess with it.
-            return [assert_]
+        """Return the AST statements to replace the ast.Assert instance.
+
+        This re-writes the test of an assertion to provide
+        intermediate values and replace it with an if statement which
+        raises an assertion error with a detailed explanation in case
+        the expression is false.
+
+        """
         self.statements = []
-        self.cond_chain = ()
         self.variables = []
         self.variable_counter = itertools.count()
         self.stack = []
@@ -528,12 +595,21 @@ class AssertionRewriter(ast.NodeVisitor):
         body = self.on_failure
         negation = ast.UnaryOp(ast.Not(), top_condition)
         self.statements.append(ast.If(negation, body, []))
-        explanation = "assert " + explanation
-        template = ast.Str(explanation)
+        if assert_.msg:
+            assertmsg = self.helper('format_assertmsg', assert_.msg)
+            explanation = "\n>assert " + explanation
+        else:
+            assertmsg = ast.Str("")
+            explanation = "assert " + explanation
+
+        if _MARK_ASSERTION_INTROSPECTION:
+            explanation = 'dessert* ' + explanation
+
+        template = ast.BinOp(assertmsg, ast.Add(), ast.Str(explanation))
         msg = self.pop_format_context(template)
         fmt = self.helper("format_explanation", msg)
         err_name = ast.Name("AssertionError", ast.Load())
-        exc = ast.Call(err_name, [fmt], [], None, None)
+        exc = ast_Call(err_name, [fmt], [])
         if sys.version_info[0] >= 3:
             raise_ = ast.Raise(exc, None)
         else:
@@ -553,7 +629,7 @@ class AssertionRewriter(ast.NodeVisitor):
     def visit_Name(self, name):
         # Display the repr of the name if it's a local variable or
         # _should_repr_global_name() thinks it's acceptable.
-        locs = ast.Call(self.builtin("locals"), [], [], None, None)
+        locs = ast_Call(self.builtin("locals"), [], [])
         inlocs = ast.Compare(ast.Str(name.id), [ast.In()], [locs])
         dorepr = self.helper("should_repr_global_name", name)
         test = ast.BoolOp(ast.Or(), [inlocs, dorepr])
@@ -580,7 +656,7 @@ class AssertionRewriter(ast.NodeVisitor):
             res, expl = self.visit(v)
             body.append(ast.Assign([ast.Name(res_var, ast.Store())], res))
             expl_format = self.pop_format_context(ast.Str(expl))
-            call = ast.Call(app, [expl_format], [], None, None)
+            call = ast_Call(app, [expl_format], [])
             self.on_failure.append(ast.Expr(call))
             if i < levels:
                 cond = res
@@ -609,7 +685,42 @@ class AssertionRewriter(ast.NodeVisitor):
         res = self.assign(ast.BinOp(left_expr, binop.op, right_expr))
         return res, explanation
 
-    def visit_Call(self, call):
+    def visit_Call_35(self, call):
+        """
+        visit `ast.Call` nodes on Python3.5 and after
+        """
+        new_func, func_expl = self.visit(call.func)
+        arg_expls = []
+        new_args = []
+        new_kwargs = []
+        for arg in call.args:
+            res, expl = self.visit(arg)
+            arg_expls.append(expl)
+            new_args.append(res)
+        for keyword in call.keywords:
+            res, expl = self.visit(keyword.value)
+            new_kwargs.append(ast.keyword(keyword.arg, res))
+            if keyword.arg:
+                arg_expls.append(keyword.arg + "=" + expl)
+            else: ## **args have `arg` keywords with an .arg of None
+                arg_expls.append("**" + expl)
+
+        expl = "%s(%s)" % (func_expl, ', '.join(arg_expls))
+        new_call = ast.Call(new_func, new_args, new_kwargs)
+        res = self.assign(new_call)
+        res_expl = self.explanation_param(self.display(res))
+        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+        return res, outer_expl
+
+    def visit_Starred(self, starred):
+        # From Python 3.5, a Starred node can appear in a function call
+        res, expl = self.visit(starred.value)
+        return starred, '*' + expl
+
+    def visit_Call_legacy(self, call):
+        """
+        visit `ast.Call nodes on 3.4 and below`
+        """
         new_func, func_expl = self.visit(call.func)
         arg_expls = []
         new_args = []
@@ -636,6 +747,15 @@ class AssertionRewriter(ast.NodeVisitor):
         res_expl = self.explanation_param(self.display(res))
         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
         return res, outer_expl
+
+    # ast.Call signature changed on 3.5,
+    # conditionally change  which methods is named
+    # visit_Call depending on Python version
+    if sys.version_info >= (3, 5):
+        visit_Call = visit_Call_35
+    else:
+        visit_Call = visit_Call_legacy
+
 
     def visit_Attribute(self, attr):
         if not isinstance(attr.ctx, ast.Load):

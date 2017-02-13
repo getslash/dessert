@@ -15,8 +15,14 @@ def test_dessert(module):
     with pytest.raises(AssertionError) as error:
         module.func()
 
+    assert 'dessert*' in str(error.value)
     assert "where" in str(error.value)
     assert "+" in str(error.value)
+
+@pytest.fixture(scope='session', autouse=True)
+def mark_dessert():
+    assert not dessert.rewrite._MARK_ASSERTION_INTROSPECTION
+    dessert.rewrite._MARK_ASSERTION_INTROSPECTION = True
 
 @pytest.fixture
 def module(request, source_filename, assertion_line):
