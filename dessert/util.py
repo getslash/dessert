@@ -40,42 +40,9 @@ def format_explanation(explanation):
     displaying diffs.
     """
     explanation = ecu(explanation)
-    explanation = _collapse_false(explanation)
     lines = _split_explanation(explanation)
     result = _format_lines(lines)
     return u('\n').join(result)
-
-
-def _collapse_false(explanation):
-    """Collapse expansions of False
-
-    So this strips out any "assert False\n{where False = ...\n}"
-    blocks.
-    """
-    where = 0
-    while True:
-        start = where = explanation.find("False\n{False = ", where)
-        if where == -1:
-            break
-        level = 0
-        prev_c = explanation[start]
-        for i, c in enumerate(explanation[start:]):
-            if prev_c + c == "\n{":
-                level += 1
-            elif prev_c + c == "\n}":
-                level -= 1
-                if not level:
-                    break
-            prev_c = c
-        else:
-            raise AssertionError("unbalanced braces: %r" % (explanation,))
-        end = start + i
-        where = end
-        if explanation[end - 1] == '\n':
-            explanation = (explanation[:start] + explanation[start+15:end-1] +
-                           explanation[end+1:])
-            where -= 17
-    return explanation
 
 
 def _split_explanation(explanation):
@@ -140,7 +107,7 @@ except NameError:
 def assertrepr_compare(config, op, left, right):
     """Return specialised explanations for some operators/operands"""
     width = 80 - 15 - len(op) - 2  # 15 chars indentation, 1 space around op
-    left_repr = py.io.saferepr(left, maxsize=int(width/2))
+    left_repr = py.io.saferepr(left, maxsize=int(width//2))
     right_repr = py.io.saferepr(right, maxsize=width-len(left_repr))
 
     summary = u('%s %s %s') % (ecu(left_repr), op, ecu(right_repr))
@@ -225,9 +192,10 @@ def _diff_text(left, right, verbose=False):
                                   'characters in diff, use -v to show') % i]
                 left = left[:-i]
                 right = right[:-i]
+    keepends = True
     explanation += [line.strip('\n')
-                    for line in ndiff(left.splitlines(),
-                                      right.splitlines())]
+                    for line in ndiff(left.splitlines(keepends),
+                                      right.splitlines(keepends))]
     return explanation
 
 
