@@ -1,5 +1,6 @@
 """Rewrite assertion AST to produce nice error messages"""
 import ast
+import _ast
 import errno
 import imp
 import itertools
@@ -9,6 +10,7 @@ import re
 import struct
 import sys
 import types
+from fnmatch import fnmatch
 
 from munch import Munch
 
@@ -62,10 +64,12 @@ class AssertionRewritingHook(object):
         self.modules = {}
         self.session = AssertRewritingSession()
         self.state = Munch()
+        self.fnpats = []
+        self._rewritten_names = set()
         self._register_with_pkg_resources()
+        self._must_rewrite = set()
 
     def find_module(self, name, path=None):
-        sess = self.session
         state = self.state
         _logger.debug("find_module called for: %s" % name)
         names = name.rsplit(".", 1)
@@ -87,7 +91,12 @@ class AssertionRewritingHook(object):
             tp = desc[2]
             if tp == imp.PY_COMPILED:
                 if hasattr(imp, "source_from_cache"):
-                    fn = imp.source_from_cache(fn)
+                    try:
+                        fn = imp.source_from_cache(fn)
+                    except ValueError:
+                        # Python 3 doesn't like orphaned but still-importable
+                        # .pyc files.
+                        fn = fn[:-1]
                 else:
                     fn = fn[:-1]
             elif tp != imp.PY_SOURCE:
@@ -96,12 +105,11 @@ class AssertionRewritingHook(object):
         else:
             fn = os.path.join(pth, name.rpartition(".")[2] + ".py")
         fn_pypath = fn
-        # Is this a test file?
-        if not os.path.isfile(fn_pypath):
-            _logger.debug("%s does not exist. Not doing anything", fn_pypath)
+        if not self._should_rewrite(name, fn_pypath, state):
             return None
-        else:
-            _logger.debug("matched test file (was specified on cmdline): %r" % (fn,))
+
+        self._rewritten_names.add(name)
+
         # The requested module looks like a test file, so rewrite it. This is
         # the most magical part of the process: load the source, rewrite the
         # asserts, and load the rewritten source. We also cache the rewritten
@@ -149,6 +157,27 @@ class AssertionRewritingHook(object):
         self.modules[name] = co, pyc
         return self
 
+    def _should_rewrite(self, name, fn_pypath, state):
+        return True
+
+    def mark_rewrite(self, *names):
+        """Mark import names as needing to be re-written.
+
+        The named module or package as well as any nested modules will
+        be re-written on import.
+        """
+        already_imported = set(names).intersection(set(sys.modules))
+        if already_imported:
+            for name in already_imported:
+                if name not in self._rewritten_names:
+                    self._warn_already_imported(name)
+        self._must_rewrite.update(names)
+
+    def _warn_already_imported(self, name):
+        self.config.warn(
+            'P1',
+            'Module already imported so can not be re-written: %s' % name)
+
     def load_module(self, name):
         # If there is an existing module object named 'fullname' in
         # sys.modules, the loader must use that existing module. (Otherwise,
@@ -168,7 +197,8 @@ class AssertionRewritingHook(object):
             mod.__loader__ = self
             py.builtin.exec_(co, mod.__dict__)
         except:
-            del sys.modules[name]
+            if name in sys.modules:
+                del sys.modules[name]
             raise
         return sys.modules[name]
 
@@ -229,6 +259,7 @@ def _write_pyc(state, co, source_path, pyc):
     finally:
         fp.close()
     return True
+
 
 RN = "\r\n".encode("utf-8")
 N = "\n".encode("utf-8")
@@ -332,9 +363,9 @@ def _read_pyc(source, pyc):
         fp.close()
 
 
-def rewrite_asserts(mod):
+def rewrite_asserts(mod, module_path=None, config=None):
     """Rewrite the assert statements in mod."""
-    AssertionRewriter().run(mod)
+    AssertionRewriter(module_path, config).run(mod)
 
 
 def _saferepr(obj):
@@ -469,6 +500,11 @@ def set_location(node, lineno, col_offset):
 
 class AssertionRewriter(ast.NodeVisitor):
 
+    def __init__(self, module_path, config):
+        super(AssertionRewriter, self).__init__()
+        self.module_path = module_path
+        self.config = config
+
     def run(self, mod):
         """Find all assert statements in *mod* and rewrite them."""
         if not mod.body:
@@ -583,6 +619,10 @@ class AssertionRewriter(ast.NodeVisitor):
         the expression is false.
 
         """
+        if isinstance(assert_.test, ast.Tuple) and self.config is not None:
+            fslocation = (self.module_path, assert_.lineno)
+            self.config.warn('R1', 'assertion is always true, perhaps '
+                              'remove parentheses?', fslocation=fslocation)
         self.statements = []
         self.variables = []
         self.variable_counter = itertools.count()
@@ -770,6 +810,8 @@ class AssertionRewriter(ast.NodeVisitor):
     def visit_Compare(self, comp):
         self.push_format_context()
         left_res, left_expl = self.visit(comp.left)
+        if isinstance(comp.left, (_ast.Compare, _ast.BoolOp)):
+            left_expl = "({0})".format(left_expl)
         res_variables = [self.variable() for i in range(len(comp.ops))]
         load_names = [ast.Name(v, ast.Load()) for v in res_variables]
         store_names = [ast.Name(v, ast.Store()) for v in res_variables]
@@ -779,6 +821,8 @@ class AssertionRewriter(ast.NodeVisitor):
         results = [left_res]
         for i, op, next_operand in it:
             next_res, next_expl = self.visit(next_operand)
+            if isinstance(next_operand, (_ast.Compare, _ast.BoolOp)):
+                next_expl = "({0})".format(next_expl)
             results.append(next_res)
             sym = binop_map[op.__class__]
             syms.append(ast.Str(sym))
