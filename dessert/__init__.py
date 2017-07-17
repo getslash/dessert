@@ -1,7 +1,7 @@
 import sys
 
 from contextlib import contextmanager
-
+from .conf import conf, DISABLE_RETROSPECTION_KEY
 from .rewrite import AssertionRewritingHook
 
 
@@ -14,3 +14,10 @@ def rewrite_assertions_context():
         yield
     finally:
         sys.meta_path[:] = prev_meta_path
+
+
+def disable_retrospection():
+    conf[DISABLE_RETROSPECTION_KEY] = True
+
+def enable_retrospection():
+    conf[DISABLE_RETROSPECTION_KEY] = False
