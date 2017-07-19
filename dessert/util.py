@@ -5,7 +5,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 import py
-from .conf import conf, DISABLE_RETROSPECTION_KEY
+from .conf import conf
 try:
     from collections import Sequence
 except ImportError:
@@ -40,7 +40,7 @@ def format_explanation(explanation, original_msg):
     for when one explanation needs to span multiple lines, e.g. when
     displaying diffs.
     """
-    if conf[DISABLE_RETROSPECTION_KEY] and original_msg:
+    if not conf.is_message_introspection_enabled() and original_msg:
         return original_msg
     explanation = ecu(explanation)
     lines = _split_explanation(explanation)
