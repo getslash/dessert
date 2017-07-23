@@ -6,7 +6,6 @@ python:
 - '3.4'
 - '3.5'
 - '3.6'
-- pypy
 install:
 - pip install -r test_requirements.txt
 - pip install -e .

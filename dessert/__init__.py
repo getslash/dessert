@@ -1,7 +1,7 @@
 import sys
 
 from contextlib import contextmanager
-
+from .conf import conf
 from .rewrite import AssertionRewritingHook
 
 
@@ -14,3 +14,10 @@ def rewrite_assertions_context():
         yield
     finally:
         sys.meta_path[:] = prev_meta_path
+
+
+def disable_introspection():
+    conf.disable_message_introspection()
+
+def enable_introspection():
+    conf.enable_message_introspection()

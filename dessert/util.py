@@ -5,6 +5,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 import py
+from .conf import conf
 try:
     from collections import Sequence
 except ImportError:
@@ -29,7 +30,7 @@ def ecu(s):
         return s
 
 
-def format_explanation(explanation):
+def format_explanation(explanation, original_msg):
     """This formats an explanation
 
     Normally all embedded newlines are escaped, however there are
@@ -39,6 +40,8 @@ def format_explanation(explanation):
     for when one explanation needs to span multiple lines, e.g. when
     displaying diffs.
     """
+    if not conf.is_message_introspection_enabled() and original_msg:
+        return original_msg
     explanation = ecu(explanation)
     lines = _split_explanation(explanation)
     result = _format_lines(lines)
