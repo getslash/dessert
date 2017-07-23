@@ -647,7 +647,7 @@ class AssertionRewriter(ast.NodeVisitor):
 
         template = ast.BinOp(assertmsg, ast.Add(), ast.Str(explanation))
         msg = self.pop_format_context(template)
-        fmt = self.helper("format_explanation", msg)
+        fmt = self.helper("format_explanation", msg, assertmsg)
         err_name = ast.Name("AssertionError", ast.Load())
         exc = ast_Call(err_name, [fmt], [])
         if sys.version_info[0] >= 3:

@@ -19,13 +19,27 @@ def test_dessert(module):
     assert "where" in str(error.value)
     assert "+" in str(error.value)
 
+
+def test_disable_introspection(add_assert_message, module, assert_message):
+    with _disable_introspection():
+        with pytest.raises(AssertionError) as error:
+            module.func()
+        if not add_assert_message:
+            assert 'dessert*' in str(error.value)
+            assert "where" in str(error.value)
+            assert "+" in str(error.value)
+        else:
+            assert assert_message in str(error.value)
+            assert "+" not in str(error.value)
+
+
 @pytest.fixture(scope='session', autouse=True)
 def mark_dessert():
     assert not dessert.rewrite._MARK_ASSERTION_INTROSPECTION
     dessert.rewrite._MARK_ASSERTION_INTROSPECTION = True
 
 @pytest.fixture
-def module(request, source_filename, assertion_line):
+def module(request, source_filename):
     with dessert.rewrite_assertions_context():
         with _disable_pytest_rewriting():
             module = emport.import_file(source_filename)
@@ -47,6 +61,14 @@ def _disable_pytest_rewriting():
     finally:
         sys.meta_path[:] = old_meta_path
 
+@contextmanager
+def _disable_introspection():
+    dessert.conf.disable_message_introspection()
+    try:
+        yield
+    finally:
+        dessert.conf.enable_message_introspection()
+
 
 @pytest.fixture(params=[
     "assert x() + y()",
@@ -56,8 +78,20 @@ def _disable_pytest_rewriting():
 def assertion_line(request):
     return request.param
 
+
+@pytest.fixture(params=[True, False])
+def add_assert_message(request):
+    return request.param
+
 @pytest.fixture
-def source(assertion_line):
+def assert_message(request):
+    return 'msg'
+
+
+@pytest.fixture
+def source(assertion_line, add_assert_message, assert_message):
+    if add_assert_message:
+        assertion_line += ", '{}'".format(assert_message)
     returned = """def f(x):
     return x
 
