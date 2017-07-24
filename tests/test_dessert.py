@@ -63,11 +63,11 @@ def _disable_pytest_rewriting():
 
 @contextmanager
 def _disable_introspection():
-    dessert.conf.disable_message_introspection()
+    dessert.disable_message_introspection()
     try:
         yield
     finally:
-        dessert.conf.enable_message_introspection()
+        dessert.enable_message_introspection()
 
 
 @pytest.fixture(params=[

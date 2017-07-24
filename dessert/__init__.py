@@ -16,8 +16,8 @@ def rewrite_assertions_context():
         sys.meta_path[:] = prev_meta_path
 
 
-def disable_introspection():
+def disable_message_introspection():
     conf.disable_message_introspection()
 
-def enable_introspection():
+def enable_message_introspection():
     conf.enable_message_introspection()
