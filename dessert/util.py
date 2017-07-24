@@ -30,7 +30,7 @@ def ecu(s):
         return s
 
 
-def format_explanation(explanation, original_msg):
+def format_explanation(explanation, original_msg=None):
     """This formats an explanation
 
     Normally all embedded newlines are escaped, however there are
