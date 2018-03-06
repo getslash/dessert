@@ -1,6 +1,6 @@
 
 ![Build Status](https://secure.travis-ci.org/vmalloc/dessert.png)
-![Version](https://pypip.in/v/dessert/badge.png)
+![Version](https://img.shields.io/pypi/v/dessert.svg)
 
 Overview
 ========
