@@ -1,10 +1,6 @@
 
-![Build Status] (https://secure.travis-ci.org/vmalloc/dessert.png )
-
-
-![Downloads] (https://img.shields.io/pypi/dm/dessert.svg )
-
-![Version] (https://img.shields.io/pypi/v/dessert.svg )
+![Build Status](https://secure.travis-ci.org/vmalloc/dessert.png)
+![Version](https://img.shields.io/pypi/v/dessert.svg)
 
 Overview
 ========
