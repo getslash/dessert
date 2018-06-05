@@ -13,10 +13,9 @@ _INSTALL_REQUIRES = [
 setup(name="dessert",
       classifiers = [
           "Programming Language :: Python :: 2.7",
-          "Programming Language :: Python :: 3.3",
-          "Programming Language :: Python :: 3.4",
           "Programming Language :: Python :: 3.5",
           "Programming Language :: Python :: 3.6",
+          "Programming Language :: Python :: 3.7",
           ],
       description="Assertion introspection via AST rewriting",
       license="MIT",
