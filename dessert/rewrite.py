@@ -307,7 +307,7 @@ def _rewrite_test(state, fn):
     if REWRITE_NEWLINES:
         source = source.replace(RN, N) + N
     try:
-        tree = ast.parse(source)
+        tree = ast.parse(source, filename=fn)
     except SyntaxError:
         # Let this pop up again in the real import.
         _logger.debug("failed to parse: %r" % (fn,))
