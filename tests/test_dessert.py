@@ -33,6 +33,26 @@ def test_disable_introspection(add_assert_message, module, assert_message):
             assert "+" not in str(error.value)
 
 
+def test_warnings_from_rewrite(source_filename):
+    tmp_dir = os.path.dirname(source_filename)
+    full_path = os.path.join(tmp_dir, 'file_with_warnings.py')
+    with open(full_path, "w") as f:
+        f.write(r"""
+import warnings
+warnings.simplefilter('always')
+warnings.warn('Some import warning')
+
+def func():
+    assert True
+""")
+    with dessert.rewrite_assertions_context():
+        with _disable_pytest_rewriting():
+            with pytest.warns(None) as caught:
+                emport.import_file(full_path)
+            [warning] = caught.list
+            assert warning.filename == full_path
+
+
 @pytest.fixture(scope='session', autouse=True)
 def mark_dessert():
     assert not dessert.rewrite._MARK_ASSERTION_INTROSPECTION
