@@ -55,6 +55,7 @@ def func():
 
 @pytest.fixture(scope='session', autouse=True)
 def mark_dessert():
+    # pylint: disable=protected-access
     assert not dessert.rewrite._MARK_ASSERTION_INTROSPECTION
     dessert.rewrite._MARK_ASSERTION_INTROSPECTION = True
 
@@ -65,7 +66,7 @@ def module(request, source_filename):
             module = emport.import_file(source_filename)
 
     @request.addfinalizer
-    def drop_from_sys_modules():
+    def drop_from_sys_modules():  # pylint: disable=unused-variable
         sys.modules.pop(module.__name__)
 
     return module
@@ -133,7 +134,7 @@ def source_filename(request, source):
     path = mkdtemp()
 
     @request.addfinalizer
-    def delete():
+    def delete():  # pylint: disable=unused-variable
         shutil.rmtree(path)
 
     filename = os.path.join(path, "sourcefile.py")
