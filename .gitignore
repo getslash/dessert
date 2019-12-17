@@ -16,6 +16,7 @@ include/
 *.class
 *.orig
 *~
+.pytest_cache
 
 flycheck-*
 flycheck_*
@@ -24,6 +25,7 @@ doc/*/_build
 build/
 dist/
 *.egg-info
+*.eggs
 issue/
 env/
 3rdparty/
@@ -33,3 +35,5 @@ env/
 .ropeproject
 .idea
 .env
+AUTHORS
+ChangeLog
