@@ -699,12 +699,12 @@ class AssertionRewriter(ast.NodeVisitor):
 
         """
         if isinstance(assert_.test, ast.Tuple) and len(assert_.test.elts) >= 1:
-            from _pytest.warning_types import PytestAssertRewriteWarning
+            from dessert.warning_types import DessertAssertRewriteWarning
             import warnings
 
             # Ignore type: typeshed bug https://github.com/python/typeshed/pull/3121
             warnings.warn_explicit(  # type: ignore
-                PytestAssertRewriteWarning(
+                DessertAssertRewriteWarning(
                     "assertion is always true, perhaps remove parentheses?"
                 ),
                 category=None,
@@ -826,10 +826,10 @@ class AssertionRewriter(ast.NodeVisitor):
         val_is_none = ast.Compare(node, [ast.Is()], [ast.NameConstant(None)])
         send_warning = ast.parse(
             """\
-from _pytest.warning_types import PytestAssertRewriteWarning
+from dessert.warning_types import DessertAssertRewriteWarning
 from warnings import warn_explicit
 warn_explicit(
-    PytestAssertRewriteWarning('asserting the value None, please use "assert is None"'),
+    DessertAssertRewriteWarning('asserting the value None, please use "assert is None"'),
     category=None,
     filename={filename!r},
     lineno={lineno},
