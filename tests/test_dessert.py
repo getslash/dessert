@@ -47,7 +47,7 @@ def func():
 """)
     with dessert.rewrite_assertions_context():
         with _disable_pytest_rewriting():
-            with pytest.warns(None) as caught:
+            with pytest.warns((UserWarning)) as caught:
                 emport.import_file(full_path)
             [warning] = caught.list
             assert warning.filename == full_path
