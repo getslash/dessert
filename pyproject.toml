@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dessert"
+description = "Assertion introspection via AST rewriting"
+readme = "README.md"
+requires-python = ">=3.5"
+license = { text = "MIT" }
+
+classifiers = [
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dependencies = ["munch", "py", "atomicwrites>=1.0", "attrs"]
+
+dynamic = ["version"]
+
+authors = [{ name = "Rotem Yaari", email = "vmalloc@gmail.com" }]
+
+[project.urls]
+"GitHub" = "https://github.com/vmalloc/dessert"
+
+[project.optional-dependencies]
+testing = ["pytest", "emport>=1.1.1"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.pytest]
+testpaths = "tests"
