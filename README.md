@@ -1,5 +1,5 @@
 
-![Build Status](https://secure.travis-ci.org/vmalloc/dessert.png)
+![Build Status](https://github.com/vmalloc/dessert/actions/workflows/test.yml/badge.svg?branch=develop)
 ![Version](https://img.shields.io/pypi/v/dessert.svg)
 
 Overview
