@@ -12,6 +12,7 @@ import marshal
 import os
 import struct
 import sys
+import tempfile
 import tokenize
 import types
 from typing import Dict
@@ -216,7 +217,7 @@ def _write_pyc(state, co, source_stat, pyc):
     # (C)Python, since these "pycs" should never be seen by builtin
     # import. However, there's little reason deviate.
     try:
-        with atomicwrites.atomic_write(pyc, mode="wb", overwrite=True) as fp:
+        with atomicwrites.atomic_write(pyc, mode="wb", overwrite=True, dir=tempfile.gettempdir()) as fp:
             fp.write(importlib.util.MAGIC_NUMBER)
             # as of now, bytecode header expects 32-bit numbers for size and mtime (#4903)
             mtime = int(source_stat.st_mtime) & 0xFFFFFFFF
