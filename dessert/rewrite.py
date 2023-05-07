@@ -831,21 +831,24 @@ class AssertionRewriter(ast.NodeVisitor):
         See issue #3191 for more details.
         """
         val_is_none = ast.Compare(node, [ast.Is()], [ast.NameConstant(None)])
-        send_warning = ast.parse(
-            """\
-from dessert.warning_types import DessertAssertRewriteWarning
-from warnings import warn_explicit
-warn_explicit(
-    DessertAssertRewriteWarning('asserting the value None, please use "assert is None"'),
-    category=None,
-    filename={filename!r},
-    lineno={lineno},
-)
-            """.format(
-                filename=module_path, lineno=lineno
-            )
-        ).body
-        return ast.If(val_is_none, send_warning, [])
+
+        exc_call = ast.Call(
+            func=ast.Name("DessertAssertRewriteWarning", ast.Load()),
+            args=[ast.Str('asserting the value None, please use "assert is None"')],
+            keywords=[]
+        )
+        warn_call = ast.Call(
+            func=ast.Name("warn_explicit", ast.Load()),
+            args=[exc_call, ast.NameConstant(None), ast.Str(module_path), ast.Num(lineno)],
+            keywords=[]
+        )
+        body = [
+            ast.ImportFrom("dessert.warning_types", [ast.alias("DessertAssertRewriteWarning")], level=0),
+            ast.ImportFrom("warnings", [ast.alias("warn_explicit")], level=0),
+            ast.Expr(warn_call),
+        ]
+
+        return ast.If(val_is_none, body, [])
 
     def visit_Name(self, name):
         # Display the repr of the name if it's a local variable or
