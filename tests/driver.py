@@ -5,7 +5,7 @@ if __name__ == "__main__":
     import dessert
 
     with dessert.rewrite_assertions_context():
-        import examples
+        import examples  # pylint: disable=import-error
 
     func = getattr(examples, example_name)
     try:

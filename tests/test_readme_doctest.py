@@ -12,8 +12,8 @@ def test_readme_doctests(tmp_filename):
     result = doctest.testfile(readme_path, module_relative=False, globs={"tmp_filename": tmp_filename})
     assert result.failed == 0
 
-@pytest.fixture
-def tmp_filename(request):
+@pytest.fixture(name="tmp_filename")
+def tmp_filename_fx(request):
     tmp_dir = tempfile.mkdtemp()
     @request.addfinalizer
     def delete():

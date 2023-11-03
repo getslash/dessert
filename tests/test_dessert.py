@@ -59,8 +59,8 @@ def mark_dessert():
     assert not dessert.rewrite._MARK_ASSERTION_INTROSPECTION
     dessert.rewrite._MARK_ASSERTION_INTROSPECTION = True
 
-@pytest.fixture
-def module(request, source_filename):
+@pytest.fixture(name="module")
+def module_fx(request, source_filename):
     with dessert.rewrite_assertions_context():
         with _disable_pytest_rewriting():
             module = emport.import_file(source_filename)
@@ -91,26 +91,26 @@ def _disable_introspection():
         dessert.enable_message_introspection()
 
 
-@pytest.fixture(params=[
+@pytest.fixture(name="assertion_line", params=[
     "assert x() + y()",
     "assert f(1) > g(100)",
     "assert f(g(2)) == f(g(1))",
     ])
-def assertion_line(request):
+def assertion_line_fx(request):
     return request.param
 
 
-@pytest.fixture(params=[True, False])
-def add_assert_message(request):
+@pytest.fixture(name="add_assert_message", params=[True, False])
+def add_assert_message_fx(request):
     return request.param
 
-@pytest.fixture
-def assert_message(request):
+@pytest.fixture(name="assert_message")
+def assert_message_fx():
     return 'msg'
 
 
-@pytest.fixture
-def source(assertion_line, add_assert_message, assert_message):
+@pytest.fixture(name="source")
+def source_fx(assertion_line, add_assert_message, assert_message):
     if add_assert_message:
         assertion_line += ", '{}'".format(assert_message)
     returned = """def f(x):
@@ -129,8 +129,8 @@ def func():
     return returned
 
 
-@pytest.fixture
-def source_filename(request, source):
+@pytest.fixture(name="source_filename")
+def source_filename_fx(request, source):
     path = mkdtemp()
 
     @request.addfinalizer

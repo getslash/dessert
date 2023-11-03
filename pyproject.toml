@@ -29,7 +29,7 @@ authors = [{ name = "Rotem Yaari", email = "vmalloc@gmail.com" }]
 "GitHub" = "https://github.com/vmalloc/dessert"
 
 [project.optional-dependencies]
-testing = ["pytest", "emport>=1.1.1"]
+testing = ["pytest", "emport>=1.1.1", "pylint"]
 
 [tool.hatch.version]
 source = "vcs"

@@ -1,5 +1,5 @@
 """Rewrite assertion AST to produce nice error messages"""
-# pylint: disable=protected-access,unused-import,logging-not-lazy,duplicate-string-formatting-argument,logging-format-interpolation,too-many-lines
+# pylint: disable=protected-access,unused-import,logging-not-lazy,duplicate-string-formatting-argument,logging-format-interpolation,too-many-lines,unused-argument,broad-exception-caught
 import ast
 import errno
 import functools
