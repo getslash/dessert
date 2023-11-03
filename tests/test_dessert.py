@@ -49,7 +49,13 @@ def func():
         with _disable_pytest_rewriting():
             with pytest.warns((UserWarning)) as caught:
                 emport.import_file(full_path)
-            [warning] = caught.list
+            # caught.list is list of warnings.WarningMessage
+            # The message member is the actual warning
+            [warning] = [
+                x
+                for x in caught.list
+                if isinstance(x.message, UserWarning)
+            ]
             assert warning.filename == full_path
 
 
