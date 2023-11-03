@@ -6,7 +6,7 @@ def _format_repr_exception(exc, obj):
     exc_name = type(exc).__name__
     try:
         exc_info = str(exc)
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         exc_info = "unknown"
     return '<[{}("{}") raised in repr()] {} object at 0x{:x}>'.format(
         exc_name, exc_info, obj.__class__.__name__, id(obj)
@@ -34,14 +34,14 @@ class SafeRepr(reprlib.Repr):
     def repr(self, x):
         try:
             s = super().repr(x)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             s = _format_repr_exception(exc, x)
         return _ellipsize(s, self.maxsize)
 
     def repr_instance(self, x, level):
         try:
             s = repr(x)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             s = _format_repr_exception(exc, x)
         return _ellipsize(s, self.maxsize)
 
@@ -53,7 +53,7 @@ def safeformat(obj):
     """
     try:
         return pprint.pformat(obj)
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         return _format_repr_exception(exc, obj)
 
 

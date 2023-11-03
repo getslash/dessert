@@ -41,7 +41,6 @@ def format_explanation(explanation, original_msg=None):
     """
     if not conf.is_message_introspection_enabled() and original_msg:
         return original_msg
-    explanation = explanation
     lines = _split_explanation(explanation)
     result = _format_lines(lines)
     return "\n".join(result)
@@ -165,7 +164,7 @@ def assertrepr_compare(config, op, left, right):
         elif op == "not in":
             if istext(left) and istext(right):
                 explanation = _notin_text(left, right, verbose)
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         _logger.exception("dessert: representation of details failed.  "
                           "Probably an object has a faulty __repr__.")
 
@@ -280,7 +279,7 @@ def _compare_eq_iterable(left, right, verbose=0):
     return explanation
 
 
-def _compare_eq_sequence(left, right, verbose=0):
+def _compare_eq_sequence(left, right, verbose=0):  # pylint: disable=unused-argument
     comparing_bytes = isinstance(left, bytes) and isinstance(right, bytes)
     explanation = []  # type: List[str]
     len_left = len(left)
@@ -334,7 +333,7 @@ def _compare_eq_sequence(left, right, verbose=0):
     return explanation
 
 
-def _compare_eq_set(left, right, verbose=0):
+def _compare_eq_set(left, right, verbose=0):  # pylint: disable=unused-argument
     explanation = []
     diff_left = left - right
     diff_right = right - left
@@ -389,7 +388,7 @@ def _compare_eq_dict(left, right, verbose=False):
 
 
 def _compare_eq_cls(left, right, verbose, type_fns):
-    isdatacls, isattrs = type_fns
+    isdatacls, isattrs = type_fns  # pylint: disable=redefined-outer-name
     if isdatacls(left):
         all_fields = left.__dataclass_fields__
         fields_to_check = [field for field, info in all_fields.items() if info.compare]

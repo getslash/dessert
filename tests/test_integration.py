@@ -17,8 +17,8 @@ def test_example_message_assertion(run_example):
 
 
 
-@pytest.fixture
-def run_example(tmpdir):
+@pytest.fixture(name="run_example")
+def run_example_fx(tmpdir):
     here = os.path.dirname(__file__)
     shutil.copy(os.path.join(here, 'driver.py'), str(tmpdir))
     shutil.copy(os.path.join(here, 'examples.py'), str(tmpdir))

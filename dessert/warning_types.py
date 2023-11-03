@@ -1,6 +1,3 @@
-import warnings
-
-
 class DessertWarning(UserWarning):
     __module__ = "dessert"
 
