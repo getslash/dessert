@@ -148,3 +148,18 @@ def source_filename_fx(request, source):
         f.write(source)
 
     return filename
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="importlib.resources.files was introduced in 3.9",
+)
+def test_load_resource_via_files_with_rewrite() -> None:
+    package_dir = mkdtemp()
+
+    with open(os.path.join(package_dir, '__init__.py'), 'w') as init_file:
+        init_file.write("""from importlib.resources import files
+assert files(__package__).exists()""")
+
+    with dessert.rewrite_assertions_context():
+        emport.import_file(os.path.join(package_dir, '__init__.py'))
