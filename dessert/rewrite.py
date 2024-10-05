@@ -26,7 +26,7 @@ import atomicwrites
 from . import util
 from .util import format_explanation as _format_explanation
 
-from .pathlib import PurePath, fnmatch_ex
+from .pathlib import Path, PurePath, fnmatch_ex
 
 import logging
 from munch import Munch
@@ -65,8 +65,8 @@ class AssertionRewritingHook(object):
         self.session = AssertRewritingSession()
         self.state = Munch()
         self.fnpats = []
-        self._rewritten_names = set()  # type: Set[str]
-        self._must_rewrite = set()  # type: Set[str]
+        self._rewritten_names: Dict[str, Path] = {}
+        self._must_rewrite: Set[str] = set()
         # flag to guard against trying to rewrite a pyc file while we are already writing another pyc file,
         # which might result in infinite recursion (#3506)
         self._writing_pyc = False
@@ -117,7 +117,7 @@ class AssertionRewritingHook(object):
         fn = module.__spec__.origin
         state = self.state
 
-        self._rewritten_names.add(module.__name__)
+        self._rewritten_names[module.__name__] = fn
 
         # The requested module looks like a test file, so rewrite it. This is
         # the most magical part of the process: load the source, rewrite the
@@ -211,6 +211,19 @@ class AssertionRewritingHook(object):
         with open(pathname, 'rb') as f:
             return f.read()
 
+    if sys.version_info >= (3, 10):
+        if sys.version_info >= (3, 12):
+            from importlib.resources.abc import TraversableResources
+        else:
+            from importlib.abc import TraversableResources
+
+        def get_resource_reader(self, name: str) -> TraversableResources:
+            if sys.version_info < (3, 11):
+                from importlib.readers import FileReader
+            else:
+                from importlib.resources.readers import FileReader
+
+            return FileReader(types.SimpleNamespace(path=self._rewritten_names[name]))
 
 def _write_pyc(state, co, source_stat, pyc):
     # Technically, we don't have to have the same pyc format as
