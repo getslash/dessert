@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Callable
 from typing import List
 from typing import Optional
+from typing import Any
 
 _logger = logging.getLogger(__name__)
 
@@ -112,6 +113,9 @@ def isdict(x):
 def isset(x):
     return isinstance(x, (set, frozenset))
 
+
+def isnamedtuple(obj: Any) -> bool:
+    return isinstance(obj, tuple) and getattr(obj, "_fields", None) is not None
 
 def isdatacls(obj):
     return getattr(obj, "__dataclass_fields__", None) is not None
@@ -397,6 +401,10 @@ def _compare_eq_cls(left, right, verbose, type_fns):
         fields_to_check = [
             field.name for field in all_fields if getattr(field, ATTRS_EQ_FIELD)
         ]
+    elif isnamedtuple(left):
+        fields_to_check = left._fields
+    else:
+        assert False
 
     same = []
     diff = []
