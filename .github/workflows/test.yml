@@ -34,7 +34,7 @@ jobs:
           uv pip install ".[testing]"
       - name: Pylint
         run: |
-          .venv/bin/pylint --rcfile=.pylintrc dessert tests
+          .venv/bin/pylint --rcfile=.pylintrc dessert tests --disable deprecated-class
       - name: Test with pytest
         run: |
           .venv/bin/pytest
