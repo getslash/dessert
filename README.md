@@ -1,5 +1,5 @@
 
-![Build Status](https://github.com/vmalloc/dessert/actions/workflows/test.yml/badge.svg?branch=develop)
+![Build Status](https://github.com/vmalloc/dessert/actions/workflows/main.yml/badge.svg?branch=master)
 ![Version](https://img.shields.io/pypi/v/dessert.svg)
 
 Overview
