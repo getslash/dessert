@@ -215,7 +215,8 @@ class AssertionRewritingHook(object):
         if sys.version_info >= (3, 12):
             from importlib.resources.abc import TraversableResources
         else:
-            from importlib.abc import TraversableResources
+            # Disabling in pylint, because it doesn't recognize it is for old versions only
+            from importlib.abc import TraversableResources  # pylint: disable=deprecated-class
 
         def get_resource_reader(self, name: str) -> TraversableResources:
             if sys.version_info < (3, 11):
@@ -567,7 +568,8 @@ class AssertionRewriter(ast.NodeVisitor):
             if (
                 expect_docstring
                 and isinstance(item, ast.Expr)
-                and isinstance(item.value, ast.Str)
+                and isinstance(item.value, ast.Constant)
+                and isinstance(item.value.value, str)
             ):
                 doc = item.value.s
                 if self.is_rewrite_disabled(doc):
@@ -685,7 +687,7 @@ class AssertionRewriter(ast.NodeVisitor):
     def pop_format_context(self, expl_expr):
         """Format the %-formatted string with current format context.
 
-        The expl_expr should be an ast.Str instance constructed from
+        The expl_expr should be an ast.Constant instance constructed from
         the %-placeholders created by .explanation_param().  This will
         add the required code to format said string to .expl_stmts and
         return the ast.Name instance of the formatted string.
@@ -694,7 +696,7 @@ class AssertionRewriter(ast.NodeVisitor):
         current = self.stack.pop()
         if self.stack:
             self.explanation_specifiers = self.stack[-1]
-        keys = [ast.Str(key) for key in current.keys()]
+        keys = [ast.Constant(key) for key in current.keys()]
         format_dict = ast.Dict(keys, list(current.values()))
         form = ast.BinOp(expl_expr, ast.Mod(), format_dict)
         name = "@py_format" + str(next(self.variable_counter))
@@ -754,16 +756,16 @@ class AssertionRewriter(ast.NodeVisitor):
 
         if self.enable_assertion_pass_hook:  # Experimental pytest_assertion_pass hook
             negation = ast.UnaryOp(ast.Not(), top_condition)
-            msg = self.pop_format_context(ast.Str(explanation))
+            msg = self.pop_format_context(ast.Constant(explanation))
 
             # Failed
             if assert_.msg:
                 assertmsg = self.helper("_format_assertmsg", assert_.msg)
                 gluestr = "\n>assert "
             else:
-                assertmsg = ast.Str("")
+                assertmsg = ast.Constant("")
                 gluestr = "assert "
-            err_explanation = ast.BinOp(ast.Str(gluestr), ast.Add(), msg)
+            err_explanation = ast.BinOp(ast.Constant(gluestr), ast.Add(), msg)
             err_msg = ast.BinOp(assertmsg, ast.Add(), err_explanation)
             err_name = ast.Name("AssertionError", ast.Load())
             fmt = self.helper("_format_explanation", err_msg)
@@ -779,8 +781,8 @@ class AssertionRewriter(ast.NodeVisitor):
             hook_call_pass = ast.Expr(
                 self.helper(
                     "_call_assertion_pass",
-                    ast.Num(assert_.lineno),
-                    ast.Str(orig),
+                    ast.Constant(assert_.lineno),
+                    ast.Constant(orig),
                     fmt_pass,
                 )
             )
@@ -799,7 +801,7 @@ class AssertionRewriter(ast.NodeVisitor):
                 variables = [
                     ast.Name(name, ast.Store()) for name in self.format_variables
                 ]
-                clear_format = ast.Assign(variables, ast.NameConstant(None))
+                clear_format = ast.Assign(variables, ast.Constant(None))
                 self.statements.append(clear_format)
 
         else:  # Original assertion rewriting
@@ -811,13 +813,13 @@ class AssertionRewriter(ast.NodeVisitor):
                 assertmsg = self.helper("_format_assertmsg", assert_.msg)
                 explanation = "\n>assert " + explanation
             else:
-                assertmsg = ast.Str("")
+                assertmsg = ast.Constant("")
                 explanation = "assert " + explanation
 
             if _MARK_ASSERTION_INTROSPECTION:
                 explanation = "dessert* " + explanation
 
-            template = ast.BinOp(assertmsg, ast.Add(), ast.Str(explanation))
+            template = ast.BinOp(assertmsg, ast.Add(), ast.Constant(explanation))
             msg = self.pop_format_context(template)
             fmt = self.helper("_format_explanation", msg, assertmsg)
             err_name = ast.Name("AssertionError", ast.Load())
@@ -829,7 +831,7 @@ class AssertionRewriter(ast.NodeVisitor):
         # Clear temporary variables by setting them to None.
         if self.variables:
             variables = [ast.Name(name, ast.Store()) for name in self.variables]
-            clear = ast.Assign(variables, ast.NameConstant(None))
+            clear = ast.Assign(variables, ast.Constant(None))
             self.statements.append(clear)
         # Fix line numbers.
         for stmt in self.statements:
@@ -843,16 +845,16 @@ class AssertionRewriter(ast.NodeVisitor):
         internally already.
         See issue #3191 for more details.
         """
-        val_is_none = ast.Compare(node, [ast.Is()], [ast.NameConstant(None)])
+        val_is_none = ast.Compare(node, [ast.Is()], [ast.Constant(None)])
 
         exc_call = ast.Call(
             func=ast.Name("DessertAssertRewriteWarning", ast.Load()),
-            args=[ast.Str('asserting the value None, please use "assert is None"')],
+            args=[ast.Constant('asserting the value None, please use "assert is None"')],
             keywords=[]
         )
         warn_call = ast.Call(
             func=ast.Name("warn_explicit", ast.Load()),
-            args=[exc_call, ast.NameConstant(None), ast.Str(module_path), ast.Num(lineno)],
+            args=[exc_call, ast.Constant(None), ast.Constant(module_path), ast.Constant(lineno)],
             keywords=[]
         )
         body = [
@@ -867,10 +869,10 @@ class AssertionRewriter(ast.NodeVisitor):
         # Display the repr of the name if it's a local variable or
         # _should_repr_global_name() thinks it's acceptable.
         locs = ast.Call(self.builtin("locals"), [], [])
-        inlocs = ast.Compare(ast.Str(name.id), [ast.In()], [locs])
+        inlocs = ast.Compare(ast.Constant(name.id), [ast.In()], [locs])
         dorepr = self.helper("_should_repr_global_name", name)
         test = ast.BoolOp(ast.Or(), [inlocs, dorepr])
-        expr = ast.IfExp(test, self.display(name), ast.Str(name.id))
+        expr = ast.IfExp(test, self.display(name), ast.Constant(name.id))
         return name, self.explanation_param(expr)
 
     def visit_BoolOp(self, boolop):
@@ -892,7 +894,7 @@ class AssertionRewriter(ast.NodeVisitor):
             self.push_format_context()
             res, expl = self.visit(v)
             body.append(ast.Assign([ast.Name(res_var, ast.Store())], res))
-            expl_format = self.pop_format_context(ast.Str(expl))
+            expl_format = self.pop_format_context(ast.Constant(expl))
             call = ast.Call(app, [expl_format], [])
             self.expl_stmts.append(ast.Expr(call))
             if i < levels:
@@ -904,7 +906,7 @@ class AssertionRewriter(ast.NodeVisitor):
                 self.statements = body = inner
         self.statements = save
         self.expl_stmts = fail_save
-        expl_template = self.helper("_format_boolop", expl_list, ast.Num(is_or))
+        expl_template = self.helper("_format_boolop", expl_list, ast.Constant(is_or))
         expl = self.pop_format_context(expl_template)
         return ast.Name(res_var, ast.Load()), self.explanation_param(expl)
 
@@ -983,9 +985,9 @@ class AssertionRewriter(ast.NodeVisitor):
                 next_expl = "({})".format(next_expl)
             results.append(next_res)
             sym = BINOP_MAP[op.__class__]
-            syms.append(ast.Str(sym))
+            syms.append(ast.Constant(sym))
             expl = "{} {} {}".format(left_expl, sym, next_expl)
-            expls.append(ast.Str(expl))
+            expls.append(ast.Constant(expl))
             res_expr = ast.Compare(left_res, [op], [next_res])
             self.statements.append(ast.Assign([store_names[i]], res_expr))
             left_res, left_expl = next_res, next_expl
