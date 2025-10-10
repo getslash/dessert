@@ -571,7 +571,7 @@ class AssertionRewriter(ast.NodeVisitor):
                 and isinstance(item.value, ast.Constant)
                 and isinstance(item.value.value, str)
             ):
-                doc = item.value.s
+                doc = item.value.value
                 if self.is_rewrite_disabled(doc):
                     return
                 expect_docstring = False
