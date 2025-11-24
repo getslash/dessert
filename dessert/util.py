@@ -268,21 +268,6 @@ def _compare_eq_iterable(left, right, verbose=0):
     return explanation
 
 
-def _compare_eq_iterable(left, right, verbose=0):
-    if not verbose:
-        return ["Use -v to get the full diff"]
-    # dynamic import to speedup pytest
-    import difflib
-
-    left_formatting = pprint.pformat(left).splitlines()
-    right_formatting = pprint.pformat(right).splitlines()
-    explanation = ["Full diff:"]
-    explanation.extend(
-        line.strip() for line in difflib.ndiff(left_formatting, right_formatting)
-    )
-    return explanation
-
-
 def _compare_eq_sequence(left, right, verbose=0):  # pylint: disable=unused-argument
     comparing_bytes = isinstance(left, bytes) and isinstance(right, bytes)
     explanation = []  # type: List[str]
