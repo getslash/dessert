@@ -241,7 +241,7 @@ def _write_pyc(state, co, source_stat, pyc):
                 fp.write(marshal.dumps(co))
 
             os.replace(tmp_file, pyc)
-    except EnvironmentError | OSError as e:
+    except (EnvironmentError, OSError) as e:
         _logger.debug("error writing pyc file at {}: errno={}".format(pyc, e.errno))
         # we ignore any failure to write the cache file
         # there are many reasons, permission-denied, __pycache__ being a
