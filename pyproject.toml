@@ -34,5 +34,5 @@ testing = ["pytest", "emport>=1.1.1", "pylint"]
 [tool.hatch.version]
 source = "vcs"
 
-[tool.pytest]
-testpaths = "tests"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
