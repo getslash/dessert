@@ -21,8 +21,6 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
-import atomicwrites
-
 from . import util
 from .util import format_explanation as _format_explanation
 
@@ -231,15 +229,19 @@ def _write_pyc(state, co, source_stat, pyc):
     # (C)Python, since these "pycs" should never be seen by builtin
     # import. However, there's little reason deviate.
     try:
-        with atomicwrites.atomic_write(pyc, mode="wb", overwrite=True, dir=tempfile.gettempdir()) as fp:
-            fp.write(importlib.util.MAGIC_NUMBER)
-            # as of now, bytecode header expects 32-bit numbers for size and mtime (#4903)
-            mtime = int(source_stat.st_mtime) & 0xFFFFFFFF
-            size = source_stat.st_size & 0xFFFFFFFF
-            # "<LL" stands for 2 unsigned longs, little-ending
-            fp.write(struct.pack("<LL", mtime, size))
-            fp.write(marshal.dumps(co))
-    except EnvironmentError as e:
+        with tempfile.TemporaryDirectory(prefix="dessert-pyc-") as tmp_dir:
+            tmp_file = os.path.join(tmp_dir, os.path.basename(pyc))
+            with open(tmp_file, mode="wb") as fp:
+                fp.write(importlib.util.MAGIC_NUMBER)
+                # as of now, bytecode header expects 32-bit numbers for size and mtime (#4903)
+                mtime = int(source_stat.st_mtime) & 0xFFFFFFFF
+                size = source_stat.st_size & 0xFFFFFFFF
+                # "<LL" stands for 2 unsigned longs, little-ending
+                fp.write(struct.pack("<LL", mtime, size))
+                fp.write(marshal.dumps(co))
+
+            os.replace(tmp_file, pyc)
+    except (EnvironmentError, OSError) as e:
         _logger.debug("error writing pyc file at {}: errno={}".format(pyc, e.errno))
         # we ignore any failure to write the cache file
         # there are many reasons, permission-denied, __pycache__ being a
